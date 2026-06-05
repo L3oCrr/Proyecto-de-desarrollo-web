@@ -7,6 +7,7 @@ use App\Controllers\AreasController;
 use App\Controllers\AuthController;
 use App\Controllers\CostCentersController;
 use App\Controllers\ExpenseDocumentsController;
+use App\Controllers\ExpensesController;
 use App\Controllers\RolesController;
 use App\Controllers\UsersController;
 use App\Core\Http\JsonResponder;
@@ -26,6 +27,7 @@ function registerRoutes(Router $router): void
     $usersController = new UsersController();
     $authController = new AuthController();
     $expenseDocumentsController = new ExpenseDocumentsController();
+    $expensesController = new ExpensesController();
 
     $router->get('/api/health', static function (): void {
         JsonResponder::send(200, [
@@ -79,5 +81,11 @@ function registerRoutes(Router $router): void
     $router->post(
         '/api/gastos/{id}/documento',
         AuthMiddleware::guard([$expenseDocumentsController, 'upload'])
+    );
+
+    // B-009: envío a aprobación con validación presupuestal
+    $router->put(
+        '/api/gastos/{id}/enviar',
+        AuthMiddleware::guard([$expensesController, 'submitForApproval'])
     );
 }
