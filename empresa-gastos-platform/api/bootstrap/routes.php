@@ -83,6 +83,10 @@ function registerRoutes(Router $router): void
     $router->get('/api/cuentas', AuthMiddleware::guard([$accountCatalogsController, 'index']));
     $router->post('/api/cuentas', AuthMiddleware::guard([$accountCatalogsController, 'store']));
 
+    // B-006 / F-003: listado y captura manual de gastos en borrador
+    $router->get('/api/gastos', AuthMiddleware::guard([$expensesController, 'index']));
+    $router->post('/api/gastos', AuthMiddleware::guard([$expensesController, 'store']));
+
     // B-007: carga segura de XML CFDI vinculado a un gasto
     $router->post(
         '/api/gastos/{id}/documento',

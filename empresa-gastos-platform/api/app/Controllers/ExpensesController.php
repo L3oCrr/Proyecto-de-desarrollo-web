@@ -6,11 +6,14 @@ namespace App\Controllers;
 
 use App\Core\Http\JsonResponder;
 use App\Middleware\AuthMiddleware;
+use App\Models\AccountCatalog;
+use App\Models\CostCenter;
 use App\Models\Expense;
 use App\Models\ExpenseStatus;
 use App\Services\AuditService;
 use App\Services\BudgetService;
 use App\Services\BudgetValidationException;
+use PDOException;
 
 /**
  * Operaciones del flujo transaccional de gastos.
@@ -25,12 +28,143 @@ final class ExpensesController extends BaseController
 
     private AuditService $auditService;
 
+    private CostCenter $costCenterModel;
+
+    private AccountCatalog $accountCatalogModel;
+
     public function __construct()
     {
         $this->expenseModel = new Expense();
         $this->expenseStatusModel = new ExpenseStatus();
         $this->budgetService = new BudgetService();
         $this->auditService = new AuditService();
+        $this->costCenterModel = new CostCenter();
+        $this->accountCatalogModel = new AccountCatalog();
+    }
+
+    /**
+     * Lista los gastos del usuario autenticado.
+     */
+    public function index(): void
+    {
+        AuthMiddleware::requireAuthentication();
+
+        $userId = (int) $_SESSION[AuthMiddleware::SESSION_USER_ID];
+
+        JsonResponder::send(200, [
+            'data' => $this->expenseModel->listByUserId($userId),
+        ]);
+    }
+
+    /**
+     * Registra un gasto manual en estado Borrador.
+     */
+    public function store(): void
+    {
+        AuthMiddleware::requireAuthentication();
+
+        $input = $this->parseJsonBody();
+        $userId = (int) $_SESSION[AuthMiddleware::SESSION_USER_ID];
+
+        $conceptoDescripcion = $this->sanitizeString($input['concepto_descripcion'] ?? null, 255);
+        $montoTotal = $this->parsePositiveDecimal($input['monto_total'] ?? null);
+        $fechaGasto = $this->parseDateValue($input['fecha_gasto'] ?? null);
+        $centroCostosId = $this->parsePositiveInt($input['centro_costos_id'] ?? null);
+        $cuentaContableId = $this->parsePositiveInt($input['cuenta_contable_id'] ?? null);
+
+        $errors = [];
+
+        if ($conceptoDescripcion === null) {
+            $errors['concepto_descripcion'][] = 'El concepto es obligatorio (máximo 255 caracteres).';
+        }
+
+        if ($montoTotal === null) {
+            $errors['monto_total'][] = 'El monto total es obligatorio y debe ser un número mayor a cero.';
+        }
+
+        if ($fechaGasto === null) {
+            $errors['fecha_gasto'][] = 'La fecha del gasto es obligatoria y debe tener formato YYYY-MM-DD.';
+        }
+
+        if ($centroCostosId === null) {
+            $errors['centro_costos_id'][] = 'El centro de costos es obligatorio.';
+        } elseif (!$this->costCenterModel->existsActive($centroCostosId)) {
+            $errors['centro_costos_id'][] = 'El centro de costos no corresponde a un registro activo.';
+        }
+
+        if ($cuentaContableId === null) {
+            $errors['cuenta_contable_id'][] = 'La cuenta contable es obligatoria.';
+        } elseif (!$this->accountCatalogModel->existsActive($cuentaContableId)) {
+            $errors['cuenta_contable_id'][] = 'La cuenta contable no corresponde a un registro activo.';
+        }
+
+        if ($errors !== []) {
+            $this->validationError($errors);
+        }
+
+        $borradorId = $this->expenseStatusModel->findIdByCodigo('BORRADOR');
+
+        if ($borradorId === null) {
+            JsonResponder::send(500, [
+                'error' => true,
+                'message' => 'No está configurado el estatus BORRADOR en el catálogo.',
+            ]);
+        }
+
+        try {
+            $createdExpense = $this->expenseModel->create([
+                'usuario_capturista_id' => $userId,
+                'centro_costos_id' => $centroCostosId,
+                'cuenta_contable_id' => $cuentaContableId,
+                'estatus_gasto_id' => $borradorId,
+                'monto_total' => $montoTotal,
+                'fecha_gasto' => $fechaGasto,
+                'concepto_descripcion' => $conceptoDescripcion,
+            ]);
+        } catch (PDOException $exception) {
+            $this->handlePersistenceException($exception);
+        }
+
+        $this->auditExpenseCreation($createdExpense);
+
+        JsonResponder::send(201, [
+            'data' => $createdExpense,
+        ]);
+    }
+
+    private function parsePositiveDecimal(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (!is_numeric($value)) {
+            return null;
+        }
+
+        $amount = (float) $value;
+
+        if ($amount <= 0) {
+            return null;
+        }
+
+        return number_format($amount, 4, '.', '');
+    }
+
+    private function parseDateValue(mixed $value): ?string
+    {
+        if (!is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $normalized = trim($value);
+        $date = \DateTimeImmutable::createFromFormat('Y-m-d', $normalized);
+
+        if ($date === false || $date->format('Y-m-d') !== $normalized) {
+            return null;
+        }
+
+        return $normalized;
     }
 
     /**

@@ -55,4 +55,18 @@ final class CostCenter extends Model
 
         return $record;
     }
+
+    public function existsActive(int $id): bool
+    {
+        $sql = sprintf(
+            'SELECT 1 FROM %s WHERE id = :id AND %s LIMIT 1',
+            $this->table(),
+            $this->softDeleteCondition()
+        );
+
+        $statement = $this->db->prepare($sql);
+        $statement->execute(['id' => $id]);
+
+        return $statement->fetchColumn() !== false;
+    }
 }

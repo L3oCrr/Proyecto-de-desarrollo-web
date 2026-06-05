@@ -20,6 +20,82 @@ final class Expense extends Model
     }
 
     /**
+     * Historial de gastos capturados por un usuario.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listByUserId(int $userId): array
+    {
+        $sql = 'SELECT g.id,
+                       g.concepto_descripcion,
+                       g.fecha_gasto,
+                       g.monto_total,
+                       e.codigo AS estatus_codigo,
+                       e.nombre AS estatus_nombre
+                FROM gastos g
+                INNER JOIN estatus_gastos e ON e.id = g.estatus_gasto_id
+                WHERE g.usuario_capturista_id = :user_id
+                ORDER BY g.fecha_gasto DESC, g.id DESC';
+
+        $statement = $this->db->prepare($sql);
+        $statement->execute(['user_id' => $userId]);
+
+        return $statement->fetchAll();
+    }
+
+    /**
+     * @param array{
+     *     usuario_capturista_id: int,
+     *     centro_costos_id: int,
+     *     cuenta_contable_id: int,
+     *     estatus_gasto_id: int,
+     *     monto_total: string,
+     *     fecha_gasto: string,
+     *     concepto_descripcion: string
+     * } $data
+     * @return array<string, mixed>
+     */
+    public function create(array $data): array
+    {
+        $statement = $this->db->prepare(
+            'INSERT INTO gastos (
+                usuario_capturista_id,
+                centro_costos_id,
+                cuenta_contable_id,
+                estatus_gasto_id,
+                monto_total,
+                fecha_gasto,
+                concepto_descripcion
+             ) VALUES (
+                :usuario_capturista_id,
+                :centro_costos_id,
+                :cuenta_contable_id,
+                :estatus_gasto_id,
+                :monto_total,
+                :fecha_gasto,
+                :concepto_descripcion
+             )'
+        );
+        $statement->execute([
+            'usuario_capturista_id' => $data['usuario_capturista_id'],
+            'centro_costos_id' => $data['centro_costos_id'],
+            'cuenta_contable_id' => $data['cuenta_contable_id'],
+            'estatus_gasto_id' => $data['estatus_gasto_id'],
+            'monto_total' => $data['monto_total'],
+            'fecha_gasto' => $data['fecha_gasto'],
+            'concepto_descripcion' => $data['concepto_descripcion'],
+        ]);
+
+        $record = $this->findPublicById((int) $this->db->lastInsertId());
+
+        if ($record === null) {
+            throw new \RuntimeException('No fue posible recuperar el gasto creado.');
+        }
+
+        return $record;
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function findOwnedById(int $expenseId, int $userId): ?array
