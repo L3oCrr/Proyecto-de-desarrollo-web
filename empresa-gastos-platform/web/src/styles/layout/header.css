@@ -1,0 +1,87 @@
+/* Header superior — área principal */
+
+.app-main {
+    min-width: 0;
+}
+
+.app-header {
+    background: #ffffff;
+    border-bottom: 1px solid #dee2e6;
+    padding: 0.9rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.app-header__welcome {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #212529;
+}
+
+.app-header__meta {
+    margin: 0.15rem 0 0;
+    font-size: 0.82rem;
+    color: #6c757d;
+}
+
+.app-header__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.app-header__logout {
+    white-space: nowrap;
+}
+
+.app-content {
+    padding: 1.5rem;
+}
+
+.app-content__card {
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: 0 0.35rem 1rem rgba(13, 59, 102, 0.06);
+}
+
+.app-content__title {
+    margin: 0 0 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #0d3b66;
+}
+
+.app-content__text {
+    margin: 0;
+    color: #6c757d;
+}
+
+.app-loading {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f4f7fb;
+    z-index: 1000;
+}
+
+.app-loading.is-hidden {
+    display: none;
+}
+
+body.app-ready .app-shell {
+    visibility: visible;
+}
+
+body:not(.app-ready) .app-shell {
+    visibility: hidden;
+}
