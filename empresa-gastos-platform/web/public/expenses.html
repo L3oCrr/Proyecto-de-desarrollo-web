@@ -90,11 +90,12 @@
                                     <th scope="col">Fecha</th>
                                     <th scope="col" class="text-end">Monto</th>
                                     <th scope="col">Estatus</th>
+                                    <th scope="col" class="text-end">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody id="expenses-table-body">
                                 <tr>
-                                    <td colspan="4" class="text-center text-muted py-4">
+                                    <td colspan="5" class="text-center text-muted py-4">
                                         Cargando gastos...
                                     </td>
                                 </tr>
@@ -195,6 +196,59 @@
                         </button>
                         <button type="submit" id="expense-submit-button" class="btn btn-primary">
                             Guardar Borrador
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div
+        class="modal fade"
+        id="xml-modal"
+        tabindex="-1"
+        aria-labelledby="xml-modal-label"
+        aria-hidden="true"
+    >
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form id="xml-form" novalidate>
+                    <div class="modal-header">
+                        <h2 class="modal-title h5" id="xml-modal-label">Subir comprobante XML (CFDI)</h2>
+                        <button
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Cerrar"
+                        ></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <p id="xml-modal-expense-label" class="text-muted small mb-3">
+                            Seleccione el archivo XML timbrado del gasto.
+                        </p>
+
+                        <div id="xml-modal-alert" class="alert d-none" role="alert"></div>
+
+                        <div class="mb-0">
+                            <label for="xml-file" class="form-label">Archivo XML</label>
+                            <input
+                                type="file"
+                                class="form-control"
+                                id="xml-file"
+                                name="documento"
+                                accept=".xml"
+                                required
+                            >
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                            Cancelar
+                        </button>
+                        <button type="submit" id="xml-submit-button" class="btn btn-primary">
+                            Subir XML
                         </button>
                     </div>
                 </form>
