@@ -6,6 +6,7 @@ use App\Controllers\AccountCatalogsController;
 use App\Controllers\AreasController;
 use App\Controllers\AuthController;
 use App\Controllers\CostCentersController;
+use App\Controllers\ExpenseDocumentsController;
 use App\Controllers\RolesController;
 use App\Controllers\UsersController;
 use App\Core\Http\JsonResponder;
@@ -24,6 +25,7 @@ function registerRoutes(Router $router): void
     $accountCatalogsController = new AccountCatalogsController();
     $usersController = new UsersController();
     $authController = new AuthController();
+    $expenseDocumentsController = new ExpenseDocumentsController();
 
     $router->get('/api/health', static function (): void {
         JsonResponder::send(200, [
@@ -72,4 +74,10 @@ function registerRoutes(Router $router): void
 
     $router->get('/api/cuentas', AuthMiddleware::guard([$accountCatalogsController, 'index']));
     $router->post('/api/cuentas', AuthMiddleware::guard([$accountCatalogsController, 'store']));
+
+    // B-007: carga segura de XML CFDI vinculado a un gasto
+    $router->post(
+        '/api/gastos/{id}/documento',
+        AuthMiddleware::guard([$expenseDocumentsController, 'upload'])
+    );
 }

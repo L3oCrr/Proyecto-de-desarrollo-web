@@ -90,6 +90,19 @@ final class Router
     private function normalizePattern(string $pattern): string
     {
         $pattern = $this->normalizePath($pattern);
+        $pattern = preg_replace_callback(
+            '/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/',
+            static function (array $matches): string {
+                $paramName = $matches[1];
+
+                if ($paramName === 'id') {
+                    return '(?P<id>\d+)';
+                }
+
+                return '(?P<' . $paramName . '>[^/]+)';
+            },
+            $pattern
+        ) ?? $pattern;
 
         return '#^' . $pattern . '$#';
     }
