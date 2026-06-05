@@ -90,7 +90,9 @@ final class Expense extends Model
                        g.fecha_gasto,
                        g.concepto_descripcion,
                        g.comentarios_rechazo,
+                       g.folio_contable_interno,
                        g.usuario_aprobador_jefe_id,
+                       g.usuario_aprobador_cxp_id,
                        g.created_at,
                        g.updated_at,
                        e.codigo AS estatus_codigo,
@@ -269,6 +271,107 @@ final class Expense extends Model
             'id' => $expenseId,
             'estatus_gasto_id' => $estatusAprobadoId,
             'usuario_aprobador_jefe_id' => $managerUserId,
+        ]);
+    }
+
+    /**
+     * Gastos aprobados por jefe pendientes de cierre por Cuentas por Pagar (vista global).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listApprovedForAccountsPayable(): array
+    {
+        $sql = 'SELECT g.id,
+                       g.usuario_capturista_id,
+                       g.centro_costos_id,
+                       g.cuenta_contable_id,
+                       g.monto_total,
+                       g.fecha_gasto,
+                       g.concepto_descripcion,
+                       g.usuario_aprobador_jefe_id,
+                       g.folio_contable_interno,
+                       g.created_at,
+                       cc.nombre AS centro_costos_nombre,
+                       cc.codigo_contable,
+                       a.id AS area_id,
+                       a.nombre AS area_nombre,
+                       u.nombre AS capturista_nombre,
+                       cat.numero_cuenta,
+                       cat.descripcion AS cuenta_descripcion,
+                       e.codigo AS estatus_codigo,
+                       e.nombre AS estatus_nombre
+                FROM gastos g
+                INNER JOIN estatus_gastos e ON e.id = g.estatus_gasto_id
+                INNER JOIN centro_costos cc ON cc.id = g.centro_costos_id
+                INNER JOIN areas a ON a.id = cc.area_id
+                INNER JOIN usuarios u ON u.id = g.usuario_capturista_id
+                LEFT JOIN catalogo_cuentas cat ON cat.id = g.cuenta_contable_id
+                WHERE e.codigo = :estatus_codigo
+                  AND g.usuario_aprobador_jefe_id IS NOT NULL
+                  AND g.folio_contable_interno IS NULL
+                  AND cc.deleted_at IS NULL
+                  AND a.deleted_at IS NULL
+                  AND u.deleted_at IS NULL
+                ORDER BY g.created_at ASC';
+
+        $statement = $this->db->prepare($sql);
+        $statement->execute(['estatus_codigo' => 'APROBADO']);
+
+        return $statement->fetchAll();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findApprovedForAccountsPayableById(int $expenseId): ?array
+    {
+        $sql = 'SELECT g.id,
+                       g.usuario_capturista_id,
+                       g.centro_costos_id,
+                       g.cuenta_contable_id,
+                       g.estatus_gasto_id,
+                       g.monto_total,
+                       g.fecha_gasto,
+                       g.concepto_descripcion,
+                       g.usuario_aprobador_jefe_id,
+                       g.folio_contable_interno,
+                       e.codigo AS estatus_codigo
+                FROM gastos g
+                INNER JOIN estatus_gastos e ON e.id = g.estatus_gasto_id
+                WHERE g.id = :id
+                  AND e.codigo = :estatus_codigo
+                  AND g.usuario_aprobador_jefe_id IS NOT NULL
+                LIMIT 1';
+
+        $statement = $this->db->prepare($sql);
+        $statement->execute([
+            'id' => $expenseId,
+            'estatus_codigo' => 'APROBADO',
+        ]);
+
+        $row = $statement->fetch();
+
+        return $row === false ? null : $row;
+    }
+
+    public function processByAccountsPayable(
+        int $expenseId,
+        int $cuentaContableId,
+        string $folioContableInterno,
+        int $cxpUserId
+    ): void {
+        $statement = $this->db->prepare(
+            'UPDATE gastos
+             SET cuenta_contable_id = :cuenta_contable_id,
+                 folio_contable_interno = :folio_contable_interno,
+                 usuario_aprobador_cxp_id = :usuario_aprobador_cxp_id
+             WHERE id = :id'
+        );
+        $statement->execute([
+            'id' => $expenseId,
+            'cuenta_contable_id' => $cuentaContableId,
+            'folio_contable_interno' => $folioContableInterno,
+            'usuario_aprobador_cxp_id' => $cxpUserId,
         ]);
     }
 

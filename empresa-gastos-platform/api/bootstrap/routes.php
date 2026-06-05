@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Controllers\AccountCatalogsController;
+use App\Controllers\AccountsPayableController;
 use App\Controllers\AreasController;
 use App\Controllers\AuthController;
 use App\Controllers\CostCentersController;
@@ -30,6 +31,7 @@ function registerRoutes(Router $router): void
     $expenseDocumentsController = new ExpenseDocumentsController();
     $expensesController = new ExpensesController();
     $expenseApprovalsController = new ExpenseApprovalsController();
+    $accountsPayableController = new AccountsPayableController();
 
     $router->get('/api/health', static function (): void {
         JsonResponder::send(200, [
@@ -103,5 +105,15 @@ function registerRoutes(Router $router): void
     $router->put(
         '/api/aprobaciones/jefe/{id}/rechazar',
         AuthMiddleware::guard([$expenseApprovalsController, 'reject'])
+    );
+
+    // B-011: bandeja global y cierre por Cuentas por Pagar
+    $router->get(
+        '/api/cxp/gastos',
+        AuthMiddleware::guard([$accountsPayableController, 'index'])
+    );
+    $router->put(
+        '/api/cxp/gastos/{id}/procesar',
+        AuthMiddleware::guard([$accountsPayableController, 'process'])
     );
 }
