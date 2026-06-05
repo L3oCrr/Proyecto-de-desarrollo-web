@@ -10,6 +10,8 @@ use App\Models\CfdiInvoice;
 use App\Models\Expense;
 use App\Services\FileService;
 use App\Services\FileValidationException;
+use App\Services\XmlParseException;
+use App\Services\XmlParserService;
 use PDOException;
 use RuntimeException;
 
@@ -24,11 +26,14 @@ final class ExpenseDocumentsController extends BaseController
 
     private FileService $fileService;
 
+    private XmlParserService $xmlParserService;
+
     public function __construct()
     {
         $this->expenseModel = new Expense();
         $this->cfdiInvoiceModel = new CfdiInvoice();
         $this->fileService = new FileService();
+        $this->xmlParserService = new XmlParserService();
     }
 
     public function upload(string $id): void
@@ -84,6 +89,9 @@ final class ExpenseDocumentsController extends BaseController
             ]);
         }
 
+        $facturaCfdiId = null;
+        $parsedCfdi = null;
+
         try {
             $this->expenseModel->beginTransaction();
 
@@ -92,22 +100,40 @@ final class ExpenseDocumentsController extends BaseController
             );
 
             $this->expenseModel->attachFacturaCfdi($expenseId, $facturaCfdiId);
-            $this->expenseModel->commit();
-        } catch (PDOException $exception) {
-            $this->expenseModel->rollBack();
 
-            if ($storedFile !== null) {
-                $this->fileService->deleteStoredFile($storedFile['absolute_path']);
-            }
+            $parsedCfdi = $this->xmlParserService->parseCfdiFile($storedFile['absolute_path']);
+
+            $cfdiRecord = $this->cfdiInvoiceModel->updateFromParsedData(
+                $facturaCfdiId,
+                $parsedCfdi
+            );
+
+            $this->expenseModel->commit();
+        } catch (XmlParseException $exception) {
+            $this->rollbackUpload($storedFile['absolute_path']);
+
+            JsonResponder::send($exception->getStatusCode(), [
+                'error' => true,
+                'message' => $exception->getMessage(),
+            ]);
+        } catch (PDOException $exception) {
+            $this->rollbackUpload($storedFile['absolute_path']);
 
             if ($exception->getCode() === '23000') {
                 JsonResponder::send(409, [
                     'error' => true,
-                    'message' => 'No fue posible vincular el documento al gasto.',
+                    'message' => 'El UUID del CFDI ya está registrado en el sistema.',
                 ]);
             }
 
             throw $exception;
+        } catch (RuntimeException $exception) {
+            $this->rollbackUpload($storedFile['absolute_path']);
+
+            JsonResponder::send(500, [
+                'error' => true,
+                'message' => 'No fue posible procesar el CFDI.',
+            ]);
         }
 
         JsonResponder::send(201, [
@@ -116,7 +142,23 @@ final class ExpenseDocumentsController extends BaseController
                 'factura_cfdi_id' => $facturaCfdiId,
                 'stored_name' => $storedFile['stored_name'],
                 'xml_file_path' => $storedFile['relative_path'],
+                'cfdi' => [
+                    'uuid' => $cfdiRecord['uuid'] ?? $parsedCfdi['uuid'],
+                    'emisor_rfc' => $cfdiRecord['emisor_rfc'] ?? $parsedCfdi['emisor_rfc'],
+                    'emisor_razon_social' => $cfdiRecord['emisor_razon_social'] ?? $parsedCfdi['emisor_razon_social'],
+                    'receptor_rfc' => $cfdiRecord['receptor_rfc'] ?? $parsedCfdi['receptor_rfc'],
+                    'monto_subtotal' => $cfdiRecord['monto_subtotal'] ?? $parsedCfdi['monto_subtotal'],
+                    'monto_iva' => $cfdiRecord['monto_iva'] ?? $parsedCfdi['monto_iva'],
+                    'monto_total' => $cfdiRecord['monto_total'] ?? $parsedCfdi['monto_total'],
+                    'fecha_emision' => $cfdiRecord['fecha_emision'] ?? $parsedCfdi['fecha_emision'],
+                ],
             ],
         ]);
+    }
+
+    private function rollbackUpload(string $absolutePath): void
+    {
+        $this->expenseModel->rollBack();
+        $this->fileService->deleteStoredFile($absolutePath);
     }
 }
