@@ -89,6 +89,8 @@ final class Expense extends Model
                        g.monto_total,
                        g.fecha_gasto,
                        g.concepto_descripcion,
+                       g.comentarios_rechazo,
+                       g.usuario_aprobador_jefe_id,
                        g.created_at,
                        g.updated_at,
                        e.codigo AS estatus_codigo,
@@ -175,6 +177,117 @@ final class Expense extends Model
         $statement->execute([
             'id' => $expenseId,
             'estatus_gasto_id' => $estatusGastoId,
+        ]);
+    }
+
+    /**
+     * Bandeja de gastos pendientes del área del jefe (centros de costos asociados).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listPendingByAreaId(int $areaId): array
+    {
+        $sql = 'SELECT g.id,
+                       g.usuario_capturista_id,
+                       g.centro_costos_id,
+                       g.monto_total,
+                       g.fecha_gasto,
+                       g.concepto_descripcion,
+                       g.created_at,
+                       cc.nombre AS centro_costos_nombre,
+                       cc.codigo_contable,
+                       u.nombre AS capturista_nombre,
+                       e.codigo AS estatus_codigo,
+                       e.nombre AS estatus_nombre
+                FROM gastos g
+                INNER JOIN centro_costos cc ON cc.id = g.centro_costos_id
+                INNER JOIN estatus_gastos e ON e.id = g.estatus_gasto_id
+                INNER JOIN usuarios u ON u.id = g.usuario_capturista_id
+                WHERE cc.area_id = :area_id
+                  AND cc.deleted_at IS NULL
+                  AND u.deleted_at IS NULL
+                  AND e.codigo = :estatus_codigo
+                ORDER BY g.created_at ASC';
+
+        $statement = $this->db->prepare($sql);
+        $statement->execute([
+            'area_id' => $areaId,
+            'estatus_codigo' => 'PENDIENTE',
+        ]);
+
+        return $statement->fetchAll();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findPendingByIdForArea(int $expenseId, int $areaId): ?array
+    {
+        $sql = 'SELECT g.id,
+                       g.usuario_capturista_id,
+                       g.centro_costos_id,
+                       g.monto_total,
+                       g.fecha_gasto,
+                       g.concepto_descripcion,
+                       g.estatus_gasto_id,
+                       cc.area_id,
+                       e.codigo AS estatus_codigo
+                FROM gastos g
+                INNER JOIN centro_costos cc ON cc.id = g.centro_costos_id
+                INNER JOIN estatus_gastos e ON e.id = g.estatus_gasto_id
+                WHERE g.id = :id
+                  AND cc.area_id = :area_id
+                  AND cc.deleted_at IS NULL
+                  AND e.codigo = :estatus_codigo
+                LIMIT 1';
+
+        $statement = $this->db->prepare($sql);
+        $statement->execute([
+            'id' => $expenseId,
+            'area_id' => $areaId,
+            'estatus_codigo' => 'PENDIENTE',
+        ]);
+
+        $row = $statement->fetch();
+
+        return $row === false ? null : $row;
+    }
+
+    public function approveByAreaManager(
+        int $expenseId,
+        int $estatusAprobadoId,
+        int $managerUserId
+    ): void {
+        $statement = $this->db->prepare(
+            'UPDATE gastos
+             SET estatus_gasto_id = :estatus_gasto_id,
+                 usuario_aprobador_jefe_id = :usuario_aprobador_jefe_id,
+                 comentarios_rechazo = NULL
+             WHERE id = :id'
+        );
+        $statement->execute([
+            'id' => $expenseId,
+            'estatus_gasto_id' => $estatusAprobadoId,
+            'usuario_aprobador_jefe_id' => $managerUserId,
+        ]);
+    }
+
+    public function rejectByAreaManager(
+        int $expenseId,
+        int $estatusRechazadoId,
+        string $comentariosRechazo
+    ): void {
+        $statement = $this->db->prepare(
+            'UPDATE gastos
+             SET estatus_gasto_id = :estatus_gasto_id,
+                 comentarios_rechazo = :comentarios_rechazo,
+                 usuario_aprobador_jefe_id = NULL
+             WHERE id = :id'
+        );
+        $statement->execute([
+            'id' => $expenseId,
+            'estatus_gasto_id' => $estatusRechazadoId,
+            'comentarios_rechazo' => $comentariosRechazo,
         ]);
     }
 

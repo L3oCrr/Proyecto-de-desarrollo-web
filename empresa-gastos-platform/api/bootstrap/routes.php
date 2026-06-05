@@ -6,6 +6,7 @@ use App\Controllers\AccountCatalogsController;
 use App\Controllers\AreasController;
 use App\Controllers\AuthController;
 use App\Controllers\CostCentersController;
+use App\Controllers\ExpenseApprovalsController;
 use App\Controllers\ExpenseDocumentsController;
 use App\Controllers\ExpensesController;
 use App\Controllers\RolesController;
@@ -28,6 +29,7 @@ function registerRoutes(Router $router): void
     $authController = new AuthController();
     $expenseDocumentsController = new ExpenseDocumentsController();
     $expensesController = new ExpensesController();
+    $expenseApprovalsController = new ExpenseApprovalsController();
 
     $router->get('/api/health', static function (): void {
         JsonResponder::send(200, [
@@ -87,5 +89,19 @@ function registerRoutes(Router $router): void
     $router->put(
         '/api/gastos/{id}/enviar',
         AuthMiddleware::guard([$expensesController, 'submitForApproval'])
+    );
+
+    // B-010: bandeja y autorización del Jefe de Área
+    $router->get(
+        '/api/aprobaciones/jefe',
+        AuthMiddleware::guard([$expenseApprovalsController, 'index'])
+    );
+    $router->put(
+        '/api/aprobaciones/jefe/{id}/aprobar',
+        AuthMiddleware::guard([$expenseApprovalsController, 'approve'])
+    );
+    $router->put(
+        '/api/aprobaciones/jefe/{id}/rechazar',
+        AuthMiddleware::guard([$expenseApprovalsController, 'reject'])
     );
 }

@@ -67,4 +67,19 @@ final class Role extends Model
 
         return $statement->fetchColumn() !== false;
     }
+
+    public function findCodigoById(int $id): ?string
+    {
+        $sql = sprintf(
+            'SELECT codigo FROM %s WHERE id = :id AND %s LIMIT 1',
+            $this->table(),
+            $this->softDeleteCondition()
+        );
+
+        $statement = $this->db->prepare($sql);
+        $statement->execute(['id' => $id]);
+        $codigo = $statement->fetchColumn();
+
+        return $codigo === false ? null : (string) $codigo;
+    }
 }
