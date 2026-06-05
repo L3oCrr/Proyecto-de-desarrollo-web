@@ -9,6 +9,7 @@ use App\Middleware\AuthMiddleware;
 use App\Models\AccountCatalog;
 use App\Models\Expense;
 use App\Models\Role;
+use App\Services\AuditService;
 use PDOException;
 
 /**
@@ -24,11 +25,14 @@ final class AccountsPayableController extends BaseController
 
     private Role $roleModel;
 
+    private AuditService $auditService;
+
     public function __construct()
     {
         $this->expenseModel = new Expense();
         $this->accountCatalogModel = new AccountCatalog();
         $this->roleModel = new Role();
+        $this->auditService = new AuditService();
     }
 
     public function index(): void
@@ -94,6 +98,10 @@ final class AccountsPayableController extends BaseController
             ]);
         }
 
+        $previousSnapshot = $this->auditService->snapshotExpense(
+            $this->expenseModel->findPublicById($expenseId)
+        );
+
         try {
             $this->expenseModel->processByAccountsPayable(
                 $expenseId,
@@ -120,6 +128,13 @@ final class AccountsPayableController extends BaseController
                 'message' => 'No fue posible recuperar el gasto procesado.',
             ]);
         }
+
+        $this->auditService->log(
+            $expenseId,
+            AuditService::ACTION_PROCESS_CXP,
+            $previousSnapshot,
+            $this->auditService->snapshotExpense($updatedExpense) ?? []
+        );
 
         JsonResponder::send(200, [
             'data' => $updatedExpense,

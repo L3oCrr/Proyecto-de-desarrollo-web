@@ -8,6 +8,7 @@ use App\Core\Http\JsonResponder;
 use App\Middleware\AuthMiddleware;
 use App\Models\Expense;
 use App\Models\ExpenseStatus;
+use App\Services\AuditService;
 use App\Services\BudgetService;
 use App\Services\BudgetValidationException;
 
@@ -22,11 +23,35 @@ final class ExpensesController extends BaseController
 
     private BudgetService $budgetService;
 
+    private AuditService $auditService;
+
     public function __construct()
     {
         $this->expenseModel = new Expense();
         $this->expenseStatusModel = new ExpenseStatus();
         $this->budgetService = new BudgetService();
+        $this->auditService = new AuditService();
+    }
+
+    /**
+     * Registra auditoría al crear un gasto en borrador (invocable desde store/create).
+     *
+     * @param array<string, mixed> $createdExpense
+     */
+    public function auditExpenseCreation(array $createdExpense): void
+    {
+        $expenseId = (int) ($createdExpense['id'] ?? 0);
+
+        if ($expenseId <= 0) {
+            return;
+        }
+
+        $this->auditService->log(
+            $expenseId,
+            AuditService::ACTION_CREATE_DRAFT,
+            null,
+            $this->auditService->snapshotExpense($createdExpense) ?? []
+        );
     }
 
     /**
@@ -62,6 +87,10 @@ final class ExpensesController extends BaseController
             ]);
         }
 
+        $previousSnapshot = $this->auditService->snapshotExpense(
+            $this->expenseModel->findPublicById($expenseId)
+        );
+
         try {
             $this->budgetService->assertSufficientFundsForExpense($expense);
         } catch (BudgetValidationException $exception) {
@@ -91,6 +120,13 @@ final class ExpensesController extends BaseController
                 'message' => 'No fue posible recuperar el gasto actualizado.',
             ]);
         }
+
+        $this->auditService->log(
+            $expenseId,
+            AuditService::ACTION_SUBMIT_APPROVAL,
+            $previousSnapshot,
+            $this->auditService->snapshotExpense($updatedExpense) ?? []
+        );
 
         JsonResponder::send(200, [
             'data' => $updatedExpense,

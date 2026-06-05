@@ -9,6 +9,7 @@ use App\Middleware\AuthMiddleware;
 use App\Models\Expense;
 use App\Models\ExpenseStatus;
 use App\Models\Role;
+use App\Services\AuditService;
 
 /**
  * Bandeja y decisiones de aprobación del Jefe de Área.
@@ -23,11 +24,14 @@ final class ExpenseApprovalsController extends BaseController
 
     private Role $roleModel;
 
+    private AuditService $auditService;
+
     public function __construct()
     {
         $this->expenseModel = new Expense();
         $this->expenseStatusModel = new ExpenseStatus();
         $this->roleModel = new Role();
+        $this->auditService = new AuditService();
     }
 
     public function index(): void
@@ -81,9 +85,27 @@ final class ExpenseApprovalsController extends BaseController
             ]);
         }
 
+        $previousSnapshot = $this->auditService->snapshotExpense(
+            $this->expenseModel->findPublicById($expenseId)
+        );
+
         $this->expenseModel->approveByAreaManager($expenseId, $aprobadoId, $managerUserId);
 
         $updatedExpense = $this->expenseModel->findPublicById($expenseId);
+
+        if ($updatedExpense === null) {
+            JsonResponder::send(500, [
+                'error' => true,
+                'message' => 'No fue posible recuperar el gasto actualizado.',
+            ]);
+        }
+
+        $this->auditService->log(
+            $expenseId,
+            AuditService::ACTION_APPROVE_MANAGER,
+            $previousSnapshot,
+            $this->auditService->snapshotExpense($updatedExpense) ?? []
+        );
 
         JsonResponder::send(200, [
             'data' => $updatedExpense,
@@ -146,9 +168,27 @@ final class ExpenseApprovalsController extends BaseController
             ]);
         }
 
+        $previousSnapshot = $this->auditService->snapshotExpense(
+            $this->expenseModel->findPublicById($expenseId)
+        );
+
         $this->expenseModel->rejectByAreaManager($expenseId, $rechazadoId, $comentariosRechazo);
 
         $updatedExpense = $this->expenseModel->findPublicById($expenseId);
+
+        if ($updatedExpense === null) {
+            JsonResponder::send(500, [
+                'error' => true,
+                'message' => 'No fue posible recuperar el gasto actualizado.',
+            ]);
+        }
+
+        $this->auditService->log(
+            $expenseId,
+            AuditService::ACTION_REJECT_MANAGER,
+            $previousSnapshot,
+            $this->auditService->snapshotExpense($updatedExpense) ?? []
+        );
 
         JsonResponder::send(200, [
             'data' => $updatedExpense,
