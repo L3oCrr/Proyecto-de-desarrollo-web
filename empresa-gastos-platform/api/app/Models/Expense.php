@@ -412,4 +412,70 @@ final class Expense extends Model
             $this->db->rollBack();
         }
     }
+
+    /**
+     * Consulta de gastos para reportes con filtros dinámicos y columnas legibles.
+     *
+     * @param array{
+     *     fecha_inicio?: string,
+     *     fecha_fin?: string,
+     *     centro_costos_id?: int,
+     *     estatus_codigo?: string
+     * } $filters
+     * @return list<array<string, mixed>>
+     */
+    public function getFilteredExpenses(array $filters): array
+    {
+        $sql = 'SELECT g.id AS gasto_id,
+                       g.fecha_gasto,
+                       u.nombre AS capturista_nombre,
+                       a.nombre AS area_nombre,
+                       cc.nombre AS centro_costos_nombre,
+                       cat.numero_cuenta AS codigo_cuenta,
+                       g.monto_total,
+                       g.concepto_descripcion,
+                       e.nombre AS estatus_nombre,
+                       e.codigo AS estatus_codigo,
+                       fc.uuid AS factura_uuid
+                FROM gastos g
+                INNER JOIN usuarios u ON u.id = g.usuario_capturista_id
+                INNER JOIN centro_costos cc ON cc.id = g.centro_costos_id
+                INNER JOIN areas a ON a.id = cc.area_id
+                INNER JOIN catalogo_cuentas cat ON cat.id = g.cuenta_contable_id
+                INNER JOIN estatus_gastos e ON e.id = g.estatus_gasto_id
+                LEFT JOIN facturas_cfdi fc ON fc.id = g.factura_cfdi_id
+                WHERE u.deleted_at IS NULL
+                  AND cc.deleted_at IS NULL
+                  AND a.deleted_at IS NULL
+                  AND cat.deleted_at IS NULL';
+
+        $params = [];
+
+        if (isset($filters['fecha_inicio'])) {
+            $sql .= ' AND g.fecha_gasto >= :fecha_inicio';
+            $params['fecha_inicio'] = $filters['fecha_inicio'];
+        }
+
+        if (isset($filters['fecha_fin'])) {
+            $sql .= ' AND g.fecha_gasto <= :fecha_fin';
+            $params['fecha_fin'] = $filters['fecha_fin'];
+        }
+
+        if (isset($filters['centro_costos_id'])) {
+            $sql .= ' AND g.centro_costos_id = :centro_costos_id';
+            $params['centro_costos_id'] = $filters['centro_costos_id'];
+        }
+
+        if (isset($filters['estatus_codigo'])) {
+            $sql .= ' AND e.codigo = :estatus_codigo';
+            $params['estatus_codigo'] = $filters['estatus_codigo'];
+        }
+
+        $sql .= ' ORDER BY g.fecha_gasto DESC, g.id DESC';
+
+        $statement = $this->db->prepare($sql);
+        $statement->execute($params);
+
+        return $statement->fetchAll();
+    }
 }

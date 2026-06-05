@@ -10,6 +10,7 @@ use App\Controllers\CostCentersController;
 use App\Controllers\ExpenseApprovalsController;
 use App\Controllers\ExpenseDocumentsController;
 use App\Controllers\ExpensesController;
+use App\Controllers\ReportsController;
 use App\Controllers\RolesController;
 use App\Controllers\UsersController;
 use App\Core\Http\JsonResponder;
@@ -32,6 +33,7 @@ function registerRoutes(Router $router): void
     $expensesController = new ExpensesController();
     $expenseApprovalsController = new ExpenseApprovalsController();
     $accountsPayableController = new AccountsPayableController();
+    $reportsController = new ReportsController();
 
     $router->get('/api/health', static function (): void {
         JsonResponder::send(200, [
@@ -115,5 +117,11 @@ function registerRoutes(Router $router): void
     $router->put(
         '/api/cxp/gastos/{id}/procesar',
         AuthMiddleware::guard([$accountsPayableController, 'process'])
+    );
+
+    // B-013: reporte exportable de gastos en CSV
+    $router->get(
+        '/api/reportes/gastos',
+        AuthMiddleware::guard([$reportsController, 'exportExpenses'])
     );
 }
