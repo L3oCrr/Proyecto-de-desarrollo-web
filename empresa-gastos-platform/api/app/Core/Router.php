@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Core;
 
 use App\Core\Http\JsonResponder;
+use App\Middleware\SecurityMiddleware;
 
 /**
  * Enrutador HTTP mínimo basado en expresiones regulares estrictas.
@@ -24,6 +25,21 @@ final class Router
         return $this->addRoute('POST', $pattern, $handler);
     }
 
+    public function put(string $pattern, callable $handler): self
+    {
+        return $this->addRoute('PUT', $pattern, $handler);
+    }
+
+    public function delete(string $pattern, callable $handler): self
+    {
+        return $this->addRoute('DELETE', $pattern, $handler);
+    }
+
+    public function patch(string $pattern, callable $handler): self
+    {
+        return $this->addRoute('PATCH', $pattern, $handler);
+    }
+
     public function addRoute(string $method, string $pattern, callable $handler): self
     {
         $this->routes[] = [
@@ -39,6 +55,10 @@ final class Router
     {
         $method = strtoupper($method);
         $path = $this->normalizePath($uri);
+
+        if (SecurityMiddleware::isMutativeMethod($method)) {
+            SecurityMiddleware::validateCsrfForMutativeRequest($method);
+        }
 
         foreach ($this->routes as $route) {
             if ($route['method'] !== $method) {
