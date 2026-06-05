@@ -4,20 +4,7 @@
 (function () {
     'use strict';
 
-    function resolveApiBaseUrl() {
-        const { origin, pathname } = window.location;
-        const webPublicMarker = '/web/public/';
-
-        if (pathname.includes(webPublicMarker)) {
-            const projectRoot = pathname.split(webPublicMarker)[0];
-
-            return origin + projectRoot + '/api/public';
-        }
-
-        return origin + '/api/public';
-    }
-
-    const API_BASE_URL = resolveApiBaseUrl();
+    const API_BASE_URL = 'http://localhost/Proyecto/empresa-gastos-platform/api/public';
 
     const loadingOverlay = document.getElementById('app-loading');
     const welcomeTitle = document.getElementById('user-welcome');
@@ -111,6 +98,8 @@
             renderUser(user);
             hideLoading();
         } catch (error) {
+            console.dir(error);
+            console.error('Detalle del fallo (auth/me):', error instanceof Error ? error.message : error);
             redirectToLogin();
         }
     }
@@ -140,6 +129,9 @@
 
             redirectToLogin();
         } catch (error) {
+            console.dir(error);
+            console.error('Detalle del fallo (logout):', error instanceof Error ? error.message : error);
+
             if (logoutButton) {
                 logoutButton.disabled = false;
                 logoutButton.textContent = 'Cerrar Sesión';

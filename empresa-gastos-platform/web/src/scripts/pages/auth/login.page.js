@@ -4,24 +4,8 @@
 (function () {
     'use strict';
 
-    /**
-     * Resuelve la URL base del backend según la ubicación del frontend.
-     * Ejemplo: .../web/public/index.html → .../api/public
-     */
-    function resolveApiBaseUrl() {
-        const { origin, pathname } = window.location;
-        const webPublicMarker = '/web/public/';
-
-        if (pathname.includes(webPublicMarker)) {
-            const projectRoot = pathname.split(webPublicMarker)[0];
-
-            return origin + projectRoot + '/api/public';
-        }
-
-        return origin + '/api/public';
-    }
-
-    const API_BASE_URL = resolveApiBaseUrl();
+    // 1. FORZAMOS LA RUTA EXACTA (Adiós al cálculo dinámico que causaba el Failed to fetch)
+    const API_BASE_URL = 'http://localhost/Proyecto/empresa-gastos-platform/api/public';
 
     const form = document.getElementById('login-form');
     const emailInput = document.getElementById('email');
@@ -31,23 +15,18 @@
     const successAlert = document.getElementById('login-success');
 
     if (!form || !emailInput || !passwordInput || !submitButton) {
+        console.error("Faltan elementos HTML en el DOM. Verifica los IDs.");
         return;
     }
 
     function showAlert(alertElement, message) {
-        if (!alertElement) {
-            return;
-        }
-
+        if (!alertElement) return;
         alertElement.textContent = message;
         alertElement.classList.add('is-visible');
     }
 
     function hideAlert(alertElement) {
-        if (!alertElement) {
-            return;
-        }
-
+        if (!alertElement) return;
         alertElement.textContent = '';
         alertElement.classList.remove('is-visible');
     }
@@ -58,6 +37,7 @@
     }
 
     async function fetchCsrfToken() {
+        console.log(`Solicitando token CSRF a: ${API_BASE_URL}/api/csrf-token`);
         const response = await fetch(API_BASE_URL + '/api/csrf-token', {
             method: 'GET',
             credentials: 'include',
@@ -71,15 +51,14 @@
         }
 
         const payload = await response.json();
-
         if (!payload.csrf_token) {
             throw new Error('Respuesta CSRF inválida.');
         }
-
         return payload.csrf_token;
     }
 
     async function login(email, password, csrfToken) {
+        console.log(`Enviando login a: ${API_BASE_URL}/api/auth/login`);
         return fetch(API_BASE_URL + '/api/auth/login', {
             method: 'POST',
             credentials: 'include',
@@ -96,7 +75,8 @@
     }
 
     form.addEventListener('submit', async function (event) {
-        event.preventDefault();
+        // Vital para que la página no recargue y mate el Fetch
+        event.preventDefault(); 
 
         hideAlert(errorAlert);
         hideAlert(successAlert);
@@ -122,33 +102,27 @@
 
             if (!response.ok) {
                 let message = 'No fue posible iniciar sesión. Intente nuevamente.';
-
                 try {
                     const errorPayload = await response.json();
-                    if (errorPayload.message) {
-                        message = errorPayload.message;
-                    }
-                } catch (parseError) {
-                    // Mantener mensaje genérico si el cuerpo no es JSON.
-                }
-
+                    if (errorPayload.message) message = errorPayload.message;
+                } catch (parseError) {}
                 showAlert(errorAlert, message);
                 return;
             }
 
             const payload = await response.json();
 
-            showAlert(
-                successAlert,
-                'Inicio de sesión exitoso. Redirigiendo al panel...'
-            );
-
+            showAlert(successAlert, 'Inicio de sesión exitoso. Redirigiendo al panel...');
             sessionStorage.setItem('auth_user', JSON.stringify(payload.data ?? {}));
 
+            // Redirección al Dashboard
             window.setTimeout(function () {
                 window.location.href = 'dashboard.html';
             }, 1200);
+
         } catch (error) {
+            console.dir(error);
+            console.error('Detalle del fallo:', error instanceof Error ? error.message : error);
             showAlert(
                 errorAlert,
                 error instanceof Error
