@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Controllers\AccountCatalogsController;
+use App\Controllers\AreasController;
+use App\Controllers\CostCentersController;
+use App\Controllers\RolesController;
 use App\Core\Http\JsonResponder;
 use App\Core\Router;
 use App\Middleware\SecurityMiddleware;
@@ -11,6 +15,11 @@ use App\Middleware\SecurityMiddleware;
  */
 function registerRoutes(Router $router): void
 {
+    $rolesController = new RolesController();
+    $areasController = new AreasController();
+    $costCentersController = new CostCentersController();
+    $accountCatalogsController = new AccountCatalogsController();
+
     $router->get('/api/health', static function (): void {
         JsonResponder::send(200, [
             'status' => 'ok',
@@ -27,18 +36,29 @@ function registerRoutes(Router $router): void
         ]);
     });
 
-    // B-003: expone el token CSRF de la sesión activa (solo lectura).
     $router->get('/api/csrf-token', static function (): void {
         JsonResponder::send(200, [
             'csrf_token' => SecurityMiddleware::getCsrfToken(),
         ]);
     });
 
-    // B-003: endpoint temporal para validar protección CSRF en POST.
     $router->post('/api/csrf-test', static function (): void {
         JsonResponder::send(200, [
             'success' => true,
             'message' => 'Token CSRF válido. Petición mutativa permitida.',
         ]);
     });
+
+    // B-004: catálogos base
+    $router->get('/api/roles', [$rolesController, 'index']);
+    $router->post('/api/roles', [$rolesController, 'store']);
+
+    $router->get('/api/areas', [$areasController, 'index']);
+    $router->post('/api/areas', [$areasController, 'store']);
+
+    $router->get('/api/centros-costo', [$costCentersController, 'index']);
+    $router->post('/api/centros-costo', [$costCentersController, 'store']);
+
+    $router->get('/api/cuentas', [$accountCatalogsController, 'index']);
+    $router->post('/api/cuentas', [$accountCatalogsController, 'store']);
 }
